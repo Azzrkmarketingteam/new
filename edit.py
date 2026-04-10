@@ -494,13 +494,17 @@ def connect_to_sheets():
             return spreadsheet
         
         # Method 2: Try Streamlit secrets (FOR CLOUD DEPLOYMENT)
-        elif 'gcp_service_account' in st.secrets:
-            creds_dict = dict(st.secrets['gcp_service_account'])
-            credentials = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-            client = gspread.authorize(credentials)
-            spreadsheet = client.open_by_url(SPREADSHEET_URL)
-            return spreadsheet
-        
+        elif "gcp_service_account" in st.secrets:
+           creds_dict = json.loads(st.secrets["gcp_service_account"]["json"])
+
+           credentials = Credentials.from_service_account_info(
+               creds_dict,
+               scopes=SCOPES
+           )
+
+           client = gspread.authorize(credentials)
+           spreadsheet = client.open_by_url(SPREADSHEET_URL)
+           return spreadsheet
         else:
             st.error("""
             ❌ **credentials.json not found!**
