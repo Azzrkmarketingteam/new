@@ -477,13 +477,14 @@ def inject_custom_css():
 
 def connect_to_sheets():
     """
-    Connect to Google Sheets using credentials.json file
-    PUT YOUR credentials.json FILE IN THE SAME FOLDER AS THIS SCRIPT!
+    Connect to Google Sheets.
+    Method 1: credentials.json file (local development)
+    Method 2: Streamlit secrets  (cloud deployment on Streamlit Community Cloud)
     """
     try:
         # Method 1: Try to load from credentials.json file (LOCAL DEVELOPMENT)
         credentials_file = 'credentials.json'
-        
+
         if os.path.exists(credentials_file):
             credentials = Credentials.from_service_account_file(
                 credentials_file, scopes=SCOPES
@@ -492,31 +493,37 @@ def connect_to_sheets():
             spreadsheet = client.open_by_url(SPREADSHEET_URL)
             st.success("Connected")
             return spreadsheet
-        
+
         # Method 2: Try Streamlit secrets (FOR CLOUD DEPLOYMENT)
-        elif "gcp_service_account" in st.secrets:
-           creds_dict = json.loads(st.secrets["gcp_service_account"]["json"])
+        elif 'gcp_service_account' in st.secrets:
+            creds_dict = dict(st.secrets['gcp_service_account'])
 
-           credentials = Credentials.from_service_account_info(
-               creds_dict,
-               scopes=SCOPES
-           )
+            # FIX: Streamlit TOML secrets sometimes store the private_key
+            # with literal '\n' (two characters) instead of actual newlines.
+            # Google's JWT library needs real newline characters to parse the
+            # PEM key. Without this, you get "Invalid JWT Signature" errors.
+            if 'private_key' in creds_dict:
+                creds_dict['private_key'] = creds_dict['private_key'].replace('\\n', '\n')
 
-           client = gspread.authorize(credentials)
-           spreadsheet = client.open_by_url(SPREADSHEET_URL)
-           return spreadsheet
+            credentials = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+            client = gspread.authorize(credentials)
+            spreadsheet = client.open_by_url(SPREADSHEET_URL)
+            return spreadsheet
+
         else:
             st.error("""
             ❌ **credentials.json not found!**
             
-            **How to fix:**
+            **How to fix (Local):**
             1. Put your `credentials.json` file in the same folder as this script
-            2. Make sure the file is named exactly `credentials.json`
-            3. Restart the app
+            
+            **How to fix (Streamlit Cloud):**
+            1. Go to App Settings → Secrets
+            2. Add your service account JSON under `[gcp_service_account]`
             
             **Current folder:** """ + os.getcwd())
             return None
-            
+
     except Exception as e:
         st.error(f"⚠️ Connection Error: {str(e)}")
         return None
